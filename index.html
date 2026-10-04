@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[STREAM ENGINE 7.4] (20 Qubits)</title>
+    <style>
+        :root {
+            --bg-color: #030712;
+            --text-color: #22c55e;
+            --dim-color: #15803d;
+            --accent-color: #38bdf8;
+            --highlight: #facc15;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .header-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(3, 7, 18, 0.95);
+            border-bottom: 2px solid #22c55e;
+            padding: 12px 20px;
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 5px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .stats-bar span {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .stream-container {
+            margin-top: 110px;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .state-line {
+            line-height: 1.4;
+            white-space: nowrap;
+        }
+
+        .bitstring { color: #facc15; font-weight: bold; }
+        .prob { color: #38bdf8; }
+        .amp { color: #4ade80; }
+        .phase { color: #c084fc; }
+
+        .btn-pause {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #22c55e;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            font-family: monospace;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
+            z-index: 101;
+        }
+        .btn-pause:hover { background: #4ade80; }
+    </style>
+</head>
+<body>
+
+<div class="header-panel">
+    <div class="title"> STREAM ENGINE 7.4 QUANTUM SIMULATION (20 QUBITS)</div>
+    <div class="stats-bar">
+        <div>Register Size: <span>20 Qubits</span></div>
+        <div>Total Hilbert States: <span>1,048,576</span></div>
+        <div>Stream Speed: <span id="fps">0</span> states/sec</div>
+        <div>Processed States: <span id="counter">0</span></div>
+    </div>
+</div>
+
+<button class="btn-pause" id="toggleBtn" onclick="toggleStream()">STOP SIMULATION</button>
+
+<div class="stream-container" id="stream"></div>
+
+<script>
+    const stream = document.getElementById('stream');
+    const counterEl = document.getElementById('counter');
+    const fpsEl = document.getElementById('fps');
+
+    let isRunning = true;
+    let totalProcessed = 0;
+    let lastFrameTime = performance.now();
+    let statesThisSecond = 0;
+
+    function generateRandomBitstring(length) {
+        let str = '';
+        for (let i = 0; i < length; i++) {
+            str += Math.random() < 0.5 ? '0' : '1';
+        }
+        return str;
+    }
+
+    function generateStateLine() {
+        const bitstring = generateRandomBitstring(20);
+        
+        const real = (Math.random() * 2 - 1) / Math.sqrt(20);
+        const imag = (Math.random() * 2 - 1) / Math.sqrt(20);
+        const prob = (real * real + imag * imag);
+        
+        const sign = imag >= 0 ? '+' : '-';
+        const realStr = (real >= 0 ? '+' : '') + real.toFixed(6);
+        const imagStr = Math.abs(imag).toFixed(6);
+
+        return `<div class="state-line">` +
+            `<span class="bitstring">|${bitstring}⟩</span> ` +
+            `Prob: <span class="prob">${prob.toFixed(8)}</span> | ` +
+            `Amp: <span class="amp">${realStr} ${sign} ${imagStr}i</span> | ` +
+            `Phase: <span class="phase">${(Math.random() * 2 * Math.PI).toFixed(4)} rad</span>` +
+            `</div>`;
+    }
+
+    function renderBatch() {
+        if (!isRunning) return;
+
+        const batchSize = Math.floor(Math.random() * 15) + 15;
+        let htmlChunk = '';
+
+        for (let i = 0; i < batchSize; i++) {
+            htmlChunk += generateStateLine();
+            totalProcessed++;
+            statesThisSecond++;
+        }
+
+        if (stream.children.length > 3000) {
+            for (let i = 0; i < batchSize; i++) {
+                if (stream.lastChild) stream.removeChild(stream.lastChild);
+            }
+        }
+
+        const div = document.createElement('div');
+        div.innerHTML = htmlChunk;
+        stream.insertBefore(div, stream.firstChild);
+
+        counterEl.innerText = totalProcessed.toLocaleString();
+
+        const now = performance.now();
+        if (now - lastFrameTime >= 1000) {
+            fpsEl.innerText = statesThisSecond.toLocaleString();
+            statesThisSecond = 0;
+            lastFrameTime = now;
+        }
+
+        requestAnimationFrame(renderBatch);
+    }
+
+    function toggleStream() {
+        isRunning = !isRunning;
+        const btn = document.getElementById('toggleBtn');
+        if (isRunning) {
+            btn.innerText = "AKISI DURDUR";
+            btn.style.background = "#22c55e";
+            renderBatch();
+        } else {
+            btn.innerText = "DEVAM ET";
+            btn.style.background = "#facc15";
+        }
+    }
+
+    renderBatch();
+</script>
+
+</body>
+</html>
